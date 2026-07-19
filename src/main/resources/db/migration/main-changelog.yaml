@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: classpath:db/migration/v1/01-create-tables.yaml
+  - include:
+      file: classpath:db/migration/v1/02-create-indexes.yaml
+  - include:
+      file: classpath:db/migration/v1/03-insert-initial-data.yaml

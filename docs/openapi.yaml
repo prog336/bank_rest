@@ -1,0 +1,850 @@
+openapi: 3.0.3
+info:
+  title: Bank Cards API
+  description: API для управления банковскими картами, пользователями и транзакциями.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер разработки
+
+tags:
+  - name: Auth
+    description: Аутентификация и авторизация
+  - name: Cards
+    description: Управление банковскими картами
+  - name: Transfers
+    description: Управление денежными переводами
+  - name: Users
+    description: Управление пользователями
+
+paths:
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Вход пользователя в систему
+      description: Аутентифицирует пользователя по номеру телефона и паролю, возвращает JWT токен.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDTO'
+      responses:
+        '200':
+          description: Успешная аутентификация. Возвращает JWT токен.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: eyJhbGciOiJIUzI1NiIs...
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Неверный номер телефона или пароль.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Пользователь не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cards:
+    get:
+      tags:
+        - Cards
+      summary: Получить список карт с фильтрацией и пагинацией
+      description: >
+        Для администраторов доступны все карты с фильтрами по номеру, имени владельца, последним цифрам и статусу.
+        Для обычных пользователей возвращаются только их карты. Параметры фильтрации передаются как query parameters.
+      operationId: getCards
+      parameters:
+        - $ref: '#/components/parameters/CardStatusQuery'
+        - $ref: '#/components/parameters/CardNumberQuery'
+        - $ref: '#/components/parameters/OwnerFullNameQuery'
+        - $ref: '#/components/parameters/LastDigitsQuery'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+      responses:
+        '200':
+          description: Список карт успешно получен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseCard'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+        - BearerAuth: []
+    post:
+      tags:
+        - Cards
+      summary: Создать новую карту
+      description: Создает новую банковскую карту для указанного владельца.
+      operationId: createCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardCreateDTO'
+      responses:
+        '201':
+          description: Карта успешно создана.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Владелец (пользователь) не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/cards/{cardId}:
+    get:
+      tags:
+        - Cards
+      summary: Получить карту по ID
+      description: Возвращает информацию о карте. Обычные пользователи могут запросить только свои карты.
+      operationId: getCardById
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Данные карты успешно получены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Доступ запрещен (пользователь не владелец карты и не администратор).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Карта не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    put:
+      tags:
+        - Cards
+      summary: Обновить данные карты (статус и/или баланс)
+      description: Позволяет изменить статус и/или баланс карты. Поля необязательные, но тело запроса не должно быть пустым.
+      operationId: updateCard
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardUpdateDTO'
+      responses:
+        '200':
+          description: Данные карты успешно обновлены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Доступ запрещен (пользователь не владелец карты и не администратор).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Карта не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    delete:
+      tags:
+        - Cards
+      summary: Удалить карту
+      description: Удаляет карту по её ID.
+      operationId: deleteCard
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Карта успешно удалена.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Карта не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/cards/{cardId}/block-request:
+    post:
+      tags:
+        - Cards
+      summary: Запросить блокировку карты
+      description: Создает запрос на блокировку активной карты. Статус меняется на BLOCK_REQUEST. Доступно только владельцу.
+      operationId: createCardBlockRequest
+      parameters:
+        - name: cardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Запрос на блокировку создан. Статус карты изменен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponseDTO'
+        '400':
+          description: Ошибка (например, карта уже неактивна).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Доступ запрещен (пользователь не владелец карты).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Карта не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/transfers:
+    get:
+      tags:
+        - Transfers
+      summary: Получить историю переводов
+      description: >
+        Возвращает список переводов с пагинацией. Требуется указать хотя бы один из параметров: sourceCardId или destinationCardId.
+        Обычные пользователи видят переводы только по своим картам.
+      operationId: getTransfers
+      parameters:
+        - name: sourceCardId
+          in: query
+          required: false
+          schema:
+            default: "e829789d-5311-45a2-aca6-ba148314d08d"
+            type: string
+            format: uuid
+          description: ID карты-отправителя.
+        - name: destinationCardId
+          in: query
+          schema:
+            default: "e829789d-5311-45a2-aca6-ba148314d08d"
+            type: string
+            format: uuid
+          description: ID карты-получателя.
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+      responses:
+        '200':
+          description: Список переводов успешно получен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseTransfer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Указанная карта-отправитель или карта-получатель не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    post:
+      tags:
+        - Transfers
+      summary: Создать денежный перевод
+      description: >
+        Создает перевод между двумя активными картами. Владелец карт (или администратор) должен быть аутентифицирован.
+        Баланс карты-отправителя должен быть достаточным.
+      operationId: createTransfer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferCreateDTO'
+      responses:
+        '201':
+          description: Перевод успешно выполнен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponseDTO'
+        '400':
+          description: Ошибка валидации или бизнес-логики (например, карты совпадают, неактивны, недостаточно средств).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Доступ запрещен (пользователь не владелец карт).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Одна из карт не найдена.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+  /api/users:
+    get:
+      tags:
+        - Users
+      summary: Получить список пользователей
+      description: Возвращает список пользователей с возможностью фильтрации по фио и/или номеру телефона, а также с пагинацией.
+      operationId: getUsers
+      parameters:
+        - name: fullName
+          in: query
+          required: false
+          schema:
+            default: "Administrator"
+            type: string
+          description: Фильтр по ФИО (или его части).
+        - name: phoneNumber
+          in: query
+          required: false
+          schema:
+            default: "+00000000000"
+            type: string
+          description: Фильтр по номеру телефона (или его части).
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+      responses:
+        '200':
+          description: Список пользователей успешно получен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedResponseUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+        - BearerAuth: []
+    post:
+      tags:
+        - Users
+      summary: Создать нового пользователя
+      description: Регистрирует нового пользователя в системе.
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequestDTO'
+      responses:
+        '201':
+          description: Пользователь успешно создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      # Регистрация обычно без токена, но если у вас по-другому, раскомментируйте строки ниже
+      # security:
+      #   - BearerAuth: []
+
+  /api/users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: Получить пользователя по ID
+      description: Возвращает информацию о конкретном пользователе.
+      operationId: getUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Данные пользователя успешно получены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    put:
+      tags:
+        - Users
+      summary: Обновить данные пользователя
+      description: Полностью обновляет данные пользователя (ФИО, телефон, пароль). Если меняется телефон, проверяется его уникальность.
+      operationId: updateUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequestDTO'
+      responses:
+        '200':
+          description: Данные пользователя успешно обновлены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponseDTO'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+    delete:
+      tags:
+        - Users
+      summary: Удалить пользователя
+      description: Удаляет пользователя по его ID.
+      operationId: deleteUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Пользователь успешно удален.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Пользователь не найден.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Вставьте сюда JWT токен, полученный при логине.
+
+  parameters:
+    PageQuery:
+      name: page
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Номер страницы (начинается с 0).
+    SizeQuery:
+      name: size
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        default: 20
+      description: Размер страницы.
+    CardStatusQuery:
+      name: status
+      in: query
+      required: true
+      schema:
+        $ref: '#/components/schemas/CardStatus'
+    CardNumberQuery:
+      name: cardNumber
+      in: query
+      required: false
+      schema:
+        default: "1111111111111111"
+        type: string
+        pattern: '^\d{16}$'
+      description: Полный 16-значный номер карты.
+    OwnerFullNameQuery:
+      name: ownerFullName
+      in: query
+      required: false
+      schema:
+        default: "Administrator"
+        type: string
+      description: ФИО владельца карты (или его часть).
+    LastDigitsQuery:
+      name: lastDigits
+      in: query
+      required: false
+      schema:
+        default: "1111"
+        type: string
+        pattern: '^\d{1,4}$'
+      description: Последние 1-4 цифры карты.
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос (ошибка валидации или бизнес-логики).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Неавторизован. Токен отсутствует или недействителен.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Доступ запрещен. Недостаточно прав.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    LoginDTO:
+      type: object
+      required:
+        - phoneNumber
+        - password
+      properties:
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{11}$'
+          description: Номер телефона в формате +XXXXXXXXXXX (12 символов).
+          example: "+79001234567"
+        password:
+          type: string
+          description: Пароль пользователя.
+          example: "Password123!"
+
+    CardCreateDTO:
+      type: object
+      required:
+        - cardNumber
+        - expiryDate
+        - ownerId
+      properties:
+        cardNumber:
+          type: string
+          pattern: '^\d{16}$'
+          description: 16-значный номер карты.
+          example: "1234567812345678"
+        expiryDate:
+          type: string
+          format: date
+          description: Дата истечения срока действия (должна быть в настоящем или будущем).
+          example: "2027-12-31"
+        ownerId:
+          type: string
+          format: uuid
+          description: UUID владельца карты.
+
+    CardUpdateDTO:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/CardStatus'
+        balance:
+          type: string
+          pattern: '^(\d+(\.\d{1,2})?)?$'
+          description: Новый баланс в виде строки (может быть пустой строкой).
+          example: "1500.00"
+
+    CardResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cardNumber:
+          type: string
+          description: Замаскированный номер карты.
+          example: "****1234"
+        expiryDate:
+          type: string
+          format: date
+        status:
+          type: string
+          description: Статус карты (ACTIVE, BLOCKED и т.д.).
+        balance:
+          type: number
+          format: double
+          description: Текущий баланс карты.
+        ownerFullName:
+          type: string
+        ownerPhoneNumber:
+          type: string
+
+    CardStatus:
+      type: string
+      enum:
+        - ACTIVE
+        - BLOCKED
+        - BLOCK_REQUEST
+        - EXPIRED
+      description: Статус банковской карты.
+
+    TransferCreateDTO:
+      type: object
+      required:
+        - amount
+        - sourceCardId
+        - destinationCardId
+      properties:
+        amount:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+          description: Сумма перевода (строка, максимум 10 знаков до запятой и 2 после).
+          example: "500.00"
+        sourceCardId:
+          type: string
+          format: uuid
+        destinationCardId:
+          type: string
+          format: uuid
+
+    TransferResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        date:
+          type: string
+          format: date-time
+        sourceCardNumber:
+          type: string
+          description: Замаскированный номер карты-отправителя.
+          example: "****5678"
+        destinationCardNumber:
+          type: string
+          description: Замаскированный номер карты-получателя.
+          example: "****1234"
+
+    UserRequestDTO:
+      type: object
+      required:
+        - fullName
+        - phoneNumber
+        - password
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          description: ФИО пользователя.
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{11}$'
+          description: Номер телефона в формате +XXXXXXXXXXX.
+        password:
+          type: string
+          pattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=?!]).{8,100}$'
+          description: Пароль (8-100 символов, должен содержать цифру, строчную, заглавную буквы и спецсимвол).
+
+    UserResponseDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        phoneNumber:
+          type: string
+
+    PagedResponseCard:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardResponseDTO'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+
+    PagedResponseTransfer:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferResponseDTO'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+
+    PagedResponseUser:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponseDTO'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        last:
+          type: boolean
+        first:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          description: HTTP статус код.
+        message:
+          type: string
+          description: Сообщение об ошибке.
+        timestamp:
+          type: string
+          format: date-time

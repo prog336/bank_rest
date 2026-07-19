@@ -1,0 +1,97 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2
+      author: Dmitriy-Gorodilov
+      comment: Создание индексов
+      changes:
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_owner_id
+            columns:
+              - column:
+                  name: owner_id
+
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_status
+            columns:
+              - column:
+                  name: status
+
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_last_digits_status
+            columns:
+              - column:
+                  name: last_digits
+              - column:
+                  name: status
+
+        - createIndex:
+            tableName: cards
+            indexName: idx_cards_owner_full_name_search
+            columns:
+              - column:
+                  name: owner_id
+              - column:
+                  name: last_digits
+              - column:
+                  name: status
+
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_source_card_id
+            columns:
+              - column:
+                  name: source_card_id
+
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_destination_card_id
+            columns:
+              - column:
+                  name: destination_card_id
+
+        - createIndex:
+            tableName: transfers
+            indexName: idx_transfers_source_dest_cards
+            columns:
+              - column:
+                  name: source_card_id
+              - column:
+                  name: destination_card_id
+
+        - createIndex:
+            tableName: users_roles
+            indexName: idx_users_roles_user_id
+            columns:
+              - column:
+                  name: user_id
+
+        - createIndex:
+            tableName: users_roles
+            indexName: idx_users_roles_role_id
+            columns:
+              - column:
+                  name: role_id
+
+  - changeSet:
+      id: 3
+      author: Dmitriy-Gorodilov
+      comment: Создание GIN индексов
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+        - sql:
+            dbms: postgresql
+            sql: CREATE INDEX IF NOT EXISTS idx_users_full_name_gin ON users USING gin (full_name gin_trgm_ops);
+
+        - sql:
+            dbms: postgresql
+            sql: CREATE INDEX IF NOT EXISTS idx_users_phone_number_gin ON users USING gin (phone_number gin_trgm_ops);
+
+        - sql:
+            dbms: postgresql
+            sql: CREATE INDEX IF NOT EXISTS idx_cards_last_digits_gin ON cards USING gin (last_digits gin_trgm_ops);

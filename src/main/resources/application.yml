@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cards-api
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  liquibase:
+    change-log: classpath:db/migration/main-changelog.yaml
+    enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    url: /openapi.yaml
+    enabled: true
+
+card:
+  encryption:
+    secret-key: ${CARD_ENCRYPTION_SECRET}
+
+jwt:
+  expiration: 86400000
+  secret-key: ${JWT_SECRET}
