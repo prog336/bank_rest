@@ -13,3 +13,8 @@
 
 Swagger UI доступен по http://localhost:8080/swagger-ui/index.html
 API доступен по http://localhost:8080
+Данные для авторизации администратора:
+{
+"phoneNumber": "+00000000000",
+"password": "admin123"
+}
